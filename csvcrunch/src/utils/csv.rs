@@ -1,6 +1,6 @@
 use std::error::Error;
 
-pub fn parse_csv(file_path: &str) -> Result<(), Box<dyn Error>> {
+pub fn parse_csv(file_path: &str) -> Result<Vec<Vec<String>>, Box<dyn Error>> {
     let mut reader = csv::Reader::from_path(file_path)?;
     let mut csv_data: Vec<Vec<String>> = Vec::new();
 
@@ -11,7 +11,5 @@ pub fn parse_csv(file_path: &str) -> Result<(), Box<dyn Error>> {
         csv_data.push(record);
     }
 
-    println!("CSV data parsed successfully: {:?}", csv_data);
-    
-    Ok(())
+    return Ok(csv_data);
 }
