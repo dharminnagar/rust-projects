@@ -1,5 +1,35 @@
+use std::thread;
+
 mod utils;
 use utils::csv::parse_csv;
+
+struct ChunkStats {
+    count: usize,
+    sum: f64,
+    min: f64,
+    max: f64,
+}
+
+// get a chunk of rows, compute stats for each, return the results
+fn compute(chunk: &[Vec<String>]) -> ChunkStats {
+    let mut stats = ChunkStats {
+        count: 0,
+        sum: 0.0,
+        min: f64::INFINITY,
+        max: f64::NEG_INFINITY,
+    };
+
+    for row in chunk {
+        if let Ok(value) = row[2].parse::<f64>() {            
+            stats.count += 1;
+            stats.sum += value;
+            stats.min = stats.min.min(value);
+            stats.max = stats.max.max(value);
+        }
+    }
+
+    return stats;
+}
 
 fn main() {
     println!("gm, this is a csv parser\n");
@@ -21,4 +51,17 @@ fn main() {
 
     let total_rows: usize = chunks.iter().map(|c| c.len()).sum();
     println!("Total rows across chunks: {}", total_rows);
+
+    let mut handles = Vec::new();
+
+    for i in 0..chunks.len() {
+        let chunk = chunks[i].to_vec();
+        let thread = thread::spawn(move || compute(&chunk));
+        handles.push(thread);
+    }
+
+    for (i, handle) in handles.into_iter().enumerate() {
+        let stats = handle.join().unwrap();
+        println!("Thread {}: count {} | min: {} | max {} | sum {}", i, stats.count, stats.min, stats.max, stats.sum);
+    }
 }
