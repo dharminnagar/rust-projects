@@ -1,4 +1,4 @@
-use std::{sync::Arc, thread};
+use std::{sync::{Arc, mpsc}, thread};
 use anyhow::{Context, Result};
 use std::env;
 
@@ -36,22 +36,30 @@ fn compute_chunk(chunk: &[Vec<String>]) -> ChunkStats {
     return stats;
 }
 
+// use mpsc for communication we could just return the stats from each thread and aggregate them in the main thread
 fn spawn_and_aggregate(parsed_csv: Arc<Vec<Vec<String>>>, chunk_size: usize, num_threads: usize) -> Vec<ChunkStats> {
-    let mut handles = Vec::new();
+
+    let (tx, rx) = mpsc::channel();
 
     for i in 0..num_threads {
+        let tx = tx.clone();
         let start = i * chunk_size;
         let end = (start + chunk_size).min(parsed_csv.len());
         let chunk = Arc::clone(&parsed_csv);
 
-        let thread = thread::spawn(move || compute_chunk(&chunk[start..end]));
-        handles.push(thread);
+        thread::spawn(move || {
+            let result = compute_chunk(&chunk[start..end]);
+            tx.send(result).unwrap();
+        });
     }
 
-    let stats: Vec<ChunkStats> = handles.into_iter().map(|handle| handle.join().unwrap()).collect();
+    drop(tx); // close the channel so that the iterator will end when all threads have finished
+
+    let stats: Vec<ChunkStats> = rx.iter().collect();
 
     return stats;
 }
+
 
 fn merge_stats(stats: Vec<ChunkStats>) -> Result<ChunkStats> {
     stats.into_iter().reduce(
